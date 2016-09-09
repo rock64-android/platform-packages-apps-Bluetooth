@@ -28,6 +28,7 @@
 namespace android {
 static jmethodID method_handlePassthroughRsp;
 static jmethodID method_onConnectionStateChanged;
+static jmethodID method_ctDataResponseCallback;
 
 static const btrc_ctrl_interface_t *sBluetoothAvrcpInterface = NULL;
 static jobject mCallbacksObj = NULL;
@@ -84,11 +85,34 @@ static void btavrcp_connection_state_callback(bool state, bt_bdaddr_t* bd_addr) 
     sCallbackEnv->DeleteLocalRef(addr);
 }
 
+static void ct_DataResponse_Callback(uint16_t txtLen,uint8_t *text) {
+    jbyteArray attr_text;
+
+    ALOGE("%s len:%d,pdu:%x", __FUNCTION__,txtLen,text[0]);
+
+    if (!checkCallbackThread()) {
+    	ALOGE("Callback: '%s' is not called on the correct thread", __FUNCTION__);
+    	return;
+    }
+
+    attr_text = sCallbackEnv->NewByteArray(txtLen);
+    if (!attr_text) {
+    	ALOGE("Fail to new jbyteArray bd addr for connection state");
+    	checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    	return;
+    }
+
+    sCallbackEnv->SetByteArrayRegion(attr_text, 0, txtLen, (jbyte*) text);
+    sCallbackEnv->CallVoidMethod(mCallbacksObj, method_ctDataResponseCallback,(jint)txtLen,attr_text);
+    checkAndClearExceptionFromCallback(sCallbackEnv, __FUNCTION__);
+    sCallbackEnv->DeleteLocalRef(attr_text);
+}
 
 static btrc_ctrl_callbacks_t sBluetoothAvrcpCallbacks = {
     sizeof(sBluetoothAvrcpCallbacks),
     btavrcp_passthrough_response_callback,
-    btavrcp_connection_state_callback
+    btavrcp_connection_state_callback,
+    ct_DataResponse_Callback
 };
 
 static void classInitNative(JNIEnv* env, jclass clazz) {
@@ -97,6 +121,7 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     method_onConnectionStateChanged =
         env->GetMethodID(clazz, "onConnectionStateChanged", "(Z[B)V");
+    method_ctDataResponseCallback = env->GetMethodID(clazz, "ctDataResponseCallback", "(I[B)V");
 
     ALOGI("%s: succeeds", __FUNCTION__);
 }

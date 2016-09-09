@@ -234,6 +234,16 @@ public class AvrcpControllerService extends ProfileService {
         }
     }
 
+    private void ctDataResponseCallback ( int len,byte[]data) {
+		
+        Log.d(TAG, "ctDataResponseCallback len:" + len+" pdu:"+data[0]);
+        byte[]rsdata = new byte[len];
+        System.arraycopy(data,0,rsdata,0,len); 
+
+        Intent intent = new Intent("android.bluetooth.ct.DataResponse");
+        intent.putExtra("data", rsdata);
+        sendBroadcast(intent);
+    }
     private void onConnectionStateChanged(boolean connected, byte[] address) {
         BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice
             (Utils.getAddressStringFromByte(address));
