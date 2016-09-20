@@ -46,7 +46,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Process;
 import java.util.HashMap;
-
+import android.os.SystemProperties;
 /**
  * This class handles the updating of the Notification Manager for the cases
  * where there is an ongoing transfer, incoming transfer need confirm and
@@ -501,31 +501,33 @@ class BluetoothOppNotification {
                     .getText(R.string.incoming_file_confirm_Notification_caption);
             int id = cursor.getInt(cursor.getColumnIndexOrThrow(BluetoothShare._ID));
             long timeStamp = cursor.getLong(cursor.getColumnIndexOrThrow(BluetoothShare.TIMESTAMP));
-            Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + id);
-
-            Notification n = new Notification();
-            n.icon = R.drawable.bt_incomming_file_notification;
-            n.flags |= Notification.FLAG_ONLY_ALERT_ONCE;
-            n.flags |= Notification.FLAG_ONGOING_EVENT;
-            n.defaults = Notification.DEFAULT_SOUND;
-            n.tickerText = title;
-
+            Uri contentUri = Uri.parse(BluetoothShare.CONTENT_URI + "/" + id);        
             Intent intent = new Intent(Constants.ACTION_INCOMING_FILE_CONFIRM);
             intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             intent.setDataAndNormalize(contentUri);
+            if(SystemProperties.get("ro.rk.statusbar","1").equals("0")) { 
+                 mContext.sendBroadcast(intent);
+            } else {
+                Notification n = new Notification();
+                n.icon = R.drawable.bt_incomming_file_notification;
+                n.flags |= Notification.FLAG_ONLY_ALERT_ONCE;
+                n.flags |= Notification.FLAG_ONGOING_EVENT;
+                n.defaults = Notification.DEFAULT_SOUND;
+                n.tickerText = title;
 
-            n.when = timeStamp;
-            n.color = mContext.getResources().getColor(
-                    com.android.internal.R.color.system_notification_accent_color);
-            n.setLatestEventInfo(mContext, title, caption, PendingIntent.getBroadcast(mContext, 0,
-                    intent, 0));
+                n.when = timeStamp;
+                n.color = mContext.getResources().getColor(
+                        com.android.internal.R.color.system_notification_accent_color);
+                n.setLatestEventInfo(mContext, title, caption, PendingIntent.getBroadcast(mContext, 0,
+                        intent, 0));
 
-            intent = new Intent(Constants.ACTION_HIDE);
-            intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
-            intent.setDataAndNormalize(contentUri);
-            n.deleteIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
+                intent = new Intent(Constants.ACTION_HIDE);
+                intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
+                intent.setDataAndNormalize(contentUri);
+                n.deleteIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
 
-            mNotificationMgr.notify(id, n);
+                mNotificationMgr.notify(id, n);
+            }
         }
         cursor.close();
     }
