@@ -68,6 +68,16 @@ import java.io.FileOutputStream;
 import java.io.File;  
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.FileDescriptor;
+import java.io.BufferedInputStream;
+import java.io.Closeable;
+import java.io.FileDescriptor;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Locale;
+import java.util.UUID;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
 
 import java.util.concurrent.locks.Lock;  
 import java.util.concurrent.locks.ReentrantLock;
@@ -78,8 +88,11 @@ final class A2dpSinkStateMachine extends StateMachine {
     private int recorder_buf_size;
     private int player_buf_size;
     private boolean mThreadExitFlag = false;
+    private boolean pcmReadThreadExitFlag = false;
     private boolean isPlaying = false;
+    private boolean isPcming = false;
     private static final int BUFFER_LEN = 256;
+    private static final int PCM_BUFFER_SIZE = 512;
     byte[][] buffer;
     private int[] buflen = new int[BUFFER_LEN];
     private int bufferRecPoint = 0;
@@ -131,6 +144,9 @@ final class A2dpSinkStateMachine extends StateMachine {
     private BluetoothDevice mTargetDevice = null;
     private BluetoothDevice mIncomingDevice = null;
 
+    private LocalSocket mPcmClient = null; 
+    private InputStream pcmIn;
+
     private final HashMap<BluetoothDevice,BluetoothAudioConfig> mAudioConfigs
             = new HashMap<BluetoothDevice,BluetoothAudioConfig>();
 
@@ -164,16 +180,12 @@ final class A2dpSinkStateMachine extends StateMachine {
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         recorder_buf_size = AudioRecord.getMinBufferSize(currentSamprate, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
         player_buf_size = AudioTrack.getMinBufferSize(currentSamprate, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
-        buffer = new byte[BUFFER_LEN][recorder_buf_size];
+        buffer = new byte[BUFFER_LEN][PCM_BUFFER_SIZE]; 	
     }
     private void cleanAudioTrack()
     {
+        stopPcmRead();
         audioPause();
-        mThreadExitFlag = true;
-        if (recorder != null) {
-            recorder.release();
-            recorder = null;
-        }
         if (player != null) {
             player.release();
             player = null;
@@ -199,14 +211,30 @@ final class A2dpSinkStateMachine extends StateMachine {
                 );
         }
     }
+	
+	private void startPcmRead()
+    {
+        if (isPcming == false) {
+            isPcming = true;
+            bufferRecPoint = 0;
+            pcmReadThreadExitFlag = false;
+            new PcmReadThread().start();
+        }
+    }
+	private void stopPcmRead()
+    {
+        if (isPcming == true) {
+            isPcming = false;
+            pcmReadThreadExitFlag = true;
+        }
+    }
+	
     private void audioPlay()
     {
         if (isPlaying == false) {
             isPlaying = true;
             mThreadExitFlag = false;
-			bufferRecPoint = 0;
-			bufferPlayPoint = 0;
-            new RecordThread().start();
+            bufferPlayPoint = 0;
 			new PlayerThread().start();
         }
     }
@@ -215,7 +243,6 @@ final class A2dpSinkStateMachine extends StateMachine {
         if (isPlaying == true) {
             isPlaying = false;
             mThreadExitFlag = true;
-            recorder.stop();
             player.stop();
         }
     }
@@ -234,6 +261,7 @@ final class A2dpSinkStateMachine extends StateMachine {
     public void cleanup() {
         cleanupNative();
         mAudioConfigs.clear();
+        cleanAudioTrack();
     }
 
     public void dump(StringBuilder sb) {
@@ -509,7 +537,7 @@ final class A2dpSinkStateMachine extends StateMachine {
                         mIncomingDevice = null;
                         transitionTo(mConnected);
                     }
-                }
+                }			
                 break;
             case CONNECTION_STATE_CONNECTING:
                 if ((mCurrentDevice != null) && mCurrentDevice.equals(device)) {
@@ -664,6 +692,7 @@ final class A2dpSinkStateMachine extends StateMachine {
                                         BluetoothA2dpSink.STATE_NOT_PLAYING);
                     mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC,
                           AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                    startPcmRead();
                     audioPlay();
                     break;
                 case AUDIO_STATE_REMOTE_SUSPEND:
@@ -671,6 +700,8 @@ final class A2dpSinkStateMachine extends StateMachine {
                     broadcastAudioState(device, BluetoothA2dpSink.STATE_NOT_PLAYING,
                                         BluetoothA2dpSink.STATE_PLAYING);
                     mAudioManager.abandonAudioFocus(mAudioFocusListener);
+					
+                    stopPcmRead();					
                     audioPause();
                     break;
                 default:
@@ -687,9 +718,9 @@ final class A2dpSinkStateMachine extends StateMachine {
         if(lastSamprate != currentSamprate){
             recorder_buf_size = AudioRecord.getMinBufferSize(currentSamprate, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
             player_buf_size = AudioTrack.getMinBufferSize(currentSamprate, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
-            buffer = new byte[BUFFER_LEN][recorder_buf_size];
+            //buffer = new byte[BUFFER_LEN][PCM_BUFFER_SIZE];
         }
-        loge("processAudioConfigEvent samprate: " + currentSamprate);
+        loge("processAudioConfigEvent samprate: " + currentSamprate+" "+recorder_buf_size+" "+player_buf_size);
         broadcastAudioConfig(device, audioConfig);
     }
 
@@ -913,6 +944,74 @@ final class A2dpSinkStateMachine extends StateMachine {
             }
         }
     };
+
+    class PcmReadThread  extends Thread{
+        @Override
+        public void run() {
+            for(int i=0;i<5;i++){//check connect ok
+                try {
+                    if(mPcmClient == null){
+                        mPcmClient = new LocalSocket();  
+                        mPcmClient.connect(new LocalSocketAddress("/data/misc/bluedroid/.a2dp_data"));
+                        log("***mPcmClient getFileDescriptor "+mPcmClient.getFileDescriptor());
+                        if(mPcmClient.isConnected()){
+                            mPcmClient.setSoTimeout(100);
+                            pcmIn = mPcmClient.getInputStream();
+                            break;
+                        }else{
+                            log("***mPcmClient connect fail,redo");
+                            pcmIn.close();
+                            mPcmClient.close();
+                            mPcmClient = null;
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                            }
+                        }						
+                    }
+                }catch (IOException e) {  
+                    e.printStackTrace();  
+                }				
+				
+            }
+	
+            while(true){
+                if (pcmReadThreadExitFlag == true) {
+                    break;
+                }
+                try {
+                    buflen[bufferRecPoint] = pcmIn.read(buffer[bufferRecPoint], 0, PCM_BUFFER_SIZE);
+                }catch (IOException e) {  
+                    //e.printStackTrace();  
+                }
+                if (buflen[bufferRecPoint]>0) {
+                    //pcm_out.write(buffer[bufferRecPoint],0,buflen[bufferRecPoint]);
+                    lock.lock();
+                    try{
+                        bufferRecPoint ++;
+                        if(bufferRecPoint>= BUFFER_LEN)
+                            bufferRecPoint = 0;
+                    }finally {  
+                        lock.unlock();  
+                    }
+                    //log("**********len:"+ buflen[bufferRecPoint]+" bufferRecPoint: " + bufferRecPoint);
+                }
+
+            }
+			
+            try {
+                if(mPcmClient != null){
+                    loge("pcmIn.close()");
+                    pcmIn.close();
+                    mPcmClient.close();
+                    mPcmClient = null;
+            }
+            }catch (IOException e) {  
+                e.printStackTrace();  
+            }
+            log("PcmReadThread end");
+        }
+    }
 
     class RecordThread  extends Thread{
         @Override
