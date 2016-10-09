@@ -393,7 +393,7 @@ final class AdapterState extends StateMachine {
                 case BEGIN_DISABLE:
                     removeMessages(SET_SCAN_MODE_TIMEOUT);
                     sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
-                    adapterService.stopProfileServices();
+                    //adapterService.stopProfileServices();
                     break;
 
                 case DISABLED:
@@ -408,10 +408,18 @@ final class AdapterState extends StateMachine {
                     }
                     removeMessages(DISABLE_TIMEOUT);
                     sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
+                    boolean bStopProfileServices = false;
+                    boolean bstopGattProfileService = false;
+                    if (adapterService.stopProfileServices()) {
+                        Log.d(TAG,"Stopping profile services that were post enabled");
+                        bStopProfileServices = true;
+                    }
                     if (adapterService.stopGattProfileService()) {
                         debugLog("Stopping Gatt profile services that were post enabled");
-                        break;
+                        bstopGattProfileService = true;
                     }
+                    if(bstopGattProfileService || bStopProfileServices)
+                        break;
                     //Fall through if no services or services already stopped
                 case BLE_STOPPED:
                     removeMessages(BLE_STOP_TIMEOUT);
