@@ -200,6 +200,7 @@ final class AdapterState extends StateMachine {
                    break;
 
                case USER_TURN_OFF:
+		   /*
                    notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF);
                    mPendingCommandState.setBleTurningOff(true);
                    adapterProperties.onBleDisable();
@@ -212,7 +213,7 @@ final class AdapterState extends StateMachine {
                         //FIXME: what about post enable services
                         mPendingCommandState.setBleTurningOff(false);
                         notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_ON);
-                   }
+                   }*/
                    break;
 
                default:
@@ -392,8 +393,21 @@ final class AdapterState extends StateMachine {
                      //Fall through
                 case BEGIN_DISABLE:
                     removeMessages(SET_SCAN_MODE_TIMEOUT);
-                    sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
+                    //sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
                     //adapterService.stopProfileServices();
+		   notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_TURNING_OFF);
+                   mPendingCommandState.setBleTurningOff(true);
+                   adapterProperties.onBleDisable();
+                   transitionTo(mPendingCommandState);
+                   sendMessageDelayed(DISABLE_TIMEOUT, DISABLE_TIMEOUT_DELAY);
+                   boolean ret = adapterService.disableNative();
+                   if (!ret) {
+                        removeMessages(DISABLE_TIMEOUT);
+                        errorLog("Error while calling disableNative");
+                        //FIXME: what about post enable services
+                        mPendingCommandState.setBleTurningOff(false);
+                        notifyAdapterStateChange(BluetoothAdapter.STATE_BLE_ON);
+                   }
                     break;
 
                 case DISABLED:
@@ -407,13 +421,14 @@ final class AdapterState extends StateMachine {
                         break;
                     }
                     removeMessages(DISABLE_TIMEOUT);
-                    sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
                     boolean bStopProfileServices = false;
                     boolean bstopGattProfileService = false;
+		    sendMessageDelayed(BREDR_STOP_TIMEOUT, BREDR_STOP_TIMEOUT_DELAY);
                     if (adapterService.stopProfileServices()) {
                         Log.d(TAG,"Stopping profile services that were post enabled");
                         bStopProfileServices = true;
                     }
+                    sendMessageDelayed(BLE_STOP_TIMEOUT, BLE_STOP_TIMEOUT_DELAY);
                     if (adapterService.stopGattProfileService()) {
                         debugLog("Stopping Gatt profile services that were post enabled");
                         bstopGattProfileService = true;
