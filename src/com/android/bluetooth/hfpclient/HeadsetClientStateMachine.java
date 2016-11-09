@@ -105,6 +105,12 @@ final class HeadsetClientStateMachine extends StateMachine {
 
     private static final int STACK_EVENT = 100;
 
+    private static final int RK_DO_NONE = 0;
+    private static final int RK_DO_ACCEPTCALL = 1;
+    private static final int RK_DO_REJECTCALL = 2;
+    private int mRkDoingStat = RK_DO_NONE;
+    //for ringtone err.donot play ring when accept call or rejectcall have done.
+
     private final Disconnected mDisconnected;
     private final Connecting mConnecting;
     private final Connected mConnected;
@@ -315,6 +321,8 @@ final class HeadsetClientStateMachine extends StateMachine {
 
     private void sendCallChangedIntent(BluetoothHeadsetClientCall c) {
         Log.d(TAG, "sendCallChangedIntent c:"+c);
+        if(c.getState() == BluetoothHeadsetClientCall.CALL_STATE_TERMINATED)
+            mRkDoingStat = RK_DO_NONE;
         Intent intent = new Intent(BluetoothHeadsetClient.ACTION_CALL_CHANGED);
         intent.putExtra(BluetoothHeadsetClient.EXTRA_CALL, c);
         mService.sendBroadcast(intent, ProfileService.BLUETOOTH_PERM);
@@ -907,6 +915,7 @@ final class HeadsetClientStateMachine extends StateMachine {
         int action;
 
         Log.d(TAG, "acceptCall: (" + flag + ")");
+        mRkDoingStat = RK_DO_ACCEPTCALL;
 
         BluetoothHeadsetClientCall c = getCall(BluetoothHeadsetClientCall.CALL_STATE_INCOMING,
                 BluetoothHeadsetClientCall.CALL_STATE_WAITING);
@@ -999,6 +1008,8 @@ final class HeadsetClientStateMachine extends StateMachine {
 
     private void rejectCall() {
         int action;
+		
+        mRkDoingStat = RK_DO_REJECTCALL;
 
         Log.d(TAG, "rejectCall");
         if ( mRingtone != null && mRingtone.isPlaying()) {
@@ -1985,6 +1996,16 @@ final class HeadsetClientStateMachine extends StateMachine {
                             }
                             int newAudioMode = AudioManager.MODE_RINGTONE;
                             int currMode = mAudioManager.getMode();
+                            if(mRkDoingStat != RK_DO_NONE){
+                                Log.e(TAG,"mRkDoingStat is no none,break");
+                                break;
+                            }
+							
+                            if(currMode != AudioManager.MODE_NORMAL){
+                                Log.e(TAG,"audio mode is no normal ,no play ring");
+                                break;
+                            }
+
                             if (currMode != newAudioMode) {
                                  // request audio focus before setting the new mode
                                  mAudioManager.requestAudioFocusForCall(AudioManager.MODE_RINGTONE,
