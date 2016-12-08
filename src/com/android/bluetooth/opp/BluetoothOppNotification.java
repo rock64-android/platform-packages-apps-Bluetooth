@@ -505,7 +505,7 @@ class BluetoothOppNotification {
             Intent intent = new Intent(Constants.ACTION_INCOMING_FILE_CONFIRM);
             intent.setClassName(Constants.THIS_PACKAGE_NAME, BluetoothOppReceiver.class.getName());
             intent.setDataAndNormalize(contentUri);
-            if(SystemProperties.get("ro.rk.statusbar","1").equals("0")) { 
+            if(SystemProperties.get("ro.rk.statusbar","1").equals("0") || "vr".equals(SystemProperties.get("ro.target.product","tablet"))) { 
                  mContext.sendBroadcast(intent);
             } else {
                 Notification n = new Notification();

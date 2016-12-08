@@ -113,11 +113,30 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
         } else if (action.equals(Constants.ACTION_INCOMING_FILE_CONFIRM)) {
             if (V) Log.v(TAG, "Receiver ACTION_INCOMING_FILE_CONFIRM");
 
-            Uri uri = intent.getData();
+           /* Uri uri = intent.getData();
             Intent in = new Intent(context, BluetoothOppIncomingFileConfirmActivity.class);
             in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             in.setDataAndNormalize(uri);
-            context.startActivity(in);
+            context.startActivity(in);*/
+                        if("vr".equals(android.os.SystemProperties.get("ro.target.product","tablet"))){
+                Intent in = new Intent("com.android.bluetooth.oppFileCome");
+                Uri uri = intent.getData();
+                BluetoothOppTransferInfo mTransInfo = new BluetoothOppTransferInfo();
+                mTransInfo = BluetoothOppUtility.queryRecord(context, uri);
+                in.putExtra("uri", uri);
+                in.putExtra("deviceName", mTransInfo.mDeviceName);
+                in.putExtra("fileName", mTransInfo.mFileName);
+                in.putExtra("fileSize",mTransInfo.mTotalBytes);
+                //in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                //in.setDataAndNormalize(uri);
+                context.sendBroadcast(in);
+            }else{
+                Uri uri = intent.getData();
+                Intent in = new Intent(context, BluetoothOppIncomingFileConfirmActivity.class);
+                in.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                in.setDataAndNormalize(uri);
+                context.startActivity(in);
+            }
 
             NotificationManager notMgr = (NotificationManager)context
                     .getSystemService(Context.NOTIFICATION_SERVICE);
@@ -128,8 +147,12 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
         } else if (action.equals(BluetoothShare.INCOMING_FILE_CONFIRMATION_REQUEST_ACTION)) {
             if (V) Log.v(TAG, "Receiver INCOMING_FILE_NOTIFICATION");
 
-            Toast.makeText(context, context.getString(R.string.incoming_file_toast_msg),
-                    Toast.LENGTH_SHORT).show();
+         /*   Toast.makeText(context, context.getString(R.string.incoming_file_toast_msg),
+                    Toast.LENGTH_SHORT).show();*/
+                        if(!"vr".equals(android.os.SystemProperties.get("ro.target.product","tablet"))){
+                Toast.makeText(context, context.getString(R.string.incoming_file_toast_msg),
+                        Toast.LENGTH_SHORT).show();
+            }
 
         } else if (action.equals(Constants.ACTION_OPEN) || action.equals(Constants.ACTION_LIST)) {
             if (V) {
@@ -274,8 +297,18 @@ public class BluetoothOppReceiver extends BroadcastReceiver {
                 }
             }
             if (V) Log.v(TAG, "Toast msg == " + toastMsg);
-            if (toastMsg != null) {
-                Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();
+           /* if (toastMsg != null) {
+                Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();*/
+                 if("vr".equals(android.os.SystemProperties.get("ro.target.product","tablet"))){
+                Log.d("chenjinsen","completeIntent");
+                Intent completeIntent = new Intent("com.android.bluetooth.oppComplete");
+                completeIntent.putExtra("deviceName",transInfo.mDeviceName);
+                completeIntent.putExtra("msg",toastMsg);
+                context.sendBroadcast(completeIntent);
+            }else{
+                if (toastMsg != null) {
+                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show();
+               }
             }
         }
     }
