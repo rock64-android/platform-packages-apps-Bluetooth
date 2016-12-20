@@ -61,6 +61,13 @@ static jobject sJniAdapterServiceObj;
 static jobject sJniCallbacksObj;
 static jfieldID sJniCallbacksField;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern int check_wifi_chip_type_string(char *type);
+#ifdef __cplusplus
+}
+#endif
 
 const bt_interface_t* getBluetoothInterface() {
     return sBluetoothInterface;
@@ -678,7 +685,15 @@ static void classInitNative(JNIEnv* env, jclass clazz) {
 
     const char *id = (strcmp(value, "1")? BT_STACK_MODULE_ID : BT_STACK_TEST_MODULE_ID);
 
-    err = hw_get_module(id, (hw_module_t const**)&module);
+    char type[64];
+    check_wifi_chip_type_string(type);
+    if (!strncmp(type, "RTL", 3)) {
+        ALOGD("%s, load %s.default.so", __func__, BT_STACK_RTK_MODULE_ID);
+        err = hw_get_module(BT_STACK_RTK_MODULE_ID, (hw_module_t const**)&module);
+    } else {
+        ALOGD("%s, load %s.default.so", __func__, id);
+        err = hw_get_module(id, (hw_module_t const**)&module);
+    }
 
     if (err == 0) {
         hw_device_t* abstraction;

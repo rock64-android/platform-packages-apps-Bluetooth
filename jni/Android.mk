@@ -25,7 +25,8 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     liblog \
-    libhardware
+    libhardware \
+    libhardware_legacy
 
 LOCAL_MULTILIB := 32
 

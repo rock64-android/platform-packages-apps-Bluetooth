@@ -27,6 +27,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := com.android.vcard bluetooth.mapsapi sap-api-java-
 LOCAL_PROTOC_OPTIMIZE_TYPE := micro
 
 LOCAL_REQUIRED_MODULES := bluetooth.default
+LOCAL_REQUIRED_MODULES += bluetooth-rtk.default
 LOCAL_MULTILIB := 32
 
 LOCAL_PROGUARD_ENABLED := disabled
