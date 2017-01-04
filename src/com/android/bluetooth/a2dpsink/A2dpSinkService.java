@@ -66,6 +66,7 @@ public class A2dpSinkService extends ProfileService {
         if (DBG) {
             Log.d(TAG, "stop()");
         }
+      if(mStateMachine != null)
         mStateMachine.doQuit();
         Intent stopIntent = new Intent(this, A2dpMediaBrowserService.class);
         stopService(stopIntent);

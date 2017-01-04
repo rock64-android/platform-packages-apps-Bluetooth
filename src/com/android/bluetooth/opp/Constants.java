@@ -210,6 +210,21 @@ public class Constants {
         "virus/*",
     };
 
+    //REALTEK ADD START
+    /**
+    RTK: You could update here to support more mime types (file types)
+    e.g.
+    public static final String[] ACCEPTABLE_SHARE_INBOUND_TYPES = new String[] {
+        "*",
+    };
+    means support all mime types (file types)
+    But we suggest not to use this setting for secure issue
+    The better solution is to append the mime type, including aliases into this list
+    Mime types: http://help.dottoro.com/lapuadlp.php
+     */
+    //REALTEK ADD END
+
+
     /**
      * The MIME type(s) of we could accept from other device.
      * This is in essence a "white list" of acceptable types.
