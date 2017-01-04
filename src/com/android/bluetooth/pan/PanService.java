@@ -266,6 +266,13 @@ public class PanService extends ProfileService {
 
     boolean disconnect(BluetoothDevice device) {
         enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
+        //REALTEK ADD START
+        int connectionState = getConnectionState(device);
+        if (connectionState != BluetoothProfile.STATE_CONNECTED &&connectionState != BluetoothProfile.STATE_CONNECTING)
+        {
+            return false;
+        }
+        //REALTEK ADD END
         Message msg = mHandler.obtainMessage(MESSAGE_DISCONNECT,device);
         mHandler.sendMessage(msg);
         return true;
