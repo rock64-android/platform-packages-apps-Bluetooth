@@ -936,8 +936,10 @@ final class A2dpSinkStateMachine extends StateMachine {
     private native boolean disconnectA2dpNative(byte[] address);
     private OnAudioFocusChangeListener mAudioFocusListener = new OnAudioFocusChangeListener() {
         public void onAudioFocusChange(int focusChange) {
+            log("mAudioFocusListener focusChange:"+focusChange);
             if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT ||
-            		focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+            		focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ||
+            		focusChange == AudioManager.AUDIOFOCUS_LOSS) {
             	audioPause();
             } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
             	audioPlay();
