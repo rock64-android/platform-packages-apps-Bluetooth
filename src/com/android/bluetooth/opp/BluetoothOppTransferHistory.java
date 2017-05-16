@@ -52,7 +52,10 @@ import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.AdapterView.OnItemClickListener;
-
+import android.graphics.Color;
+import android.view.ViewGroup;
+import android.widget.Toolbar;
+import android.os.SystemProperties;
 /**
  * View showing the user's finished bluetooth opp transfers that the user does
  * not confirm. Including outbound and inbound transfers, both successful and
@@ -139,8 +142,22 @@ public class BluetoothOppTransferHistory extends Activity implements
 
         mNotifier = new BluetoothOppNotification(this);
         mContextMenu = false;
+        String product = SystemProperties.get("ro.target.product", "unknow");
+        if(product.equals("box"))
+            initActionBar();
     }
 
+    private void initActionBar(){
+        Toolbar toolbar = (Toolbar)findViewById(com.android.internal.R.id.action_bar);
+        toolbar.inflateMenu(R.menu.transferhistory_box);
+        View clearView = findViewById(R.id.transfer_menu_clear_all);
+        clearView.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				promptClearList();
+			}
+		});
+    }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         if (mTransferCursor != null && !mShowAllIncoming) {
@@ -247,6 +264,7 @@ public class BluetoothOppTransferHistory extends Activity implements
      * Clear all finished transfers, error and success transfer items.
      */
     private void clearAllDownloads() {
+        Log.i(TAG, "clearAllDownloads");
         if (mTransferCursor.moveToFirst()) {
             while (!mTransferCursor.isAfterLast()) {
                 int sessionId = mTransferCursor.getInt(mIdColumnId);
